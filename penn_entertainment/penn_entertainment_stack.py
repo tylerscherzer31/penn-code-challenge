@@ -77,7 +77,11 @@ class PennEntertainmentStack(Stack):
                 "DB_USER": "dbadmin",
             },
             # attach lambda layer with dependencies
-            layers=[lambda_layer]  
+            layers=[lambda_layer],
+            # set the memory size to handle multiple simultaneous uploads
+            memory_size=128,
+            # set the reserved concurrency to handle 100 concurrent executions without throttling
+            reserved_concurrent_executions=100
         )
 
         # give Lambda permissions to read from the s3 bucket

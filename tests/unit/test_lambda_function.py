@@ -18,15 +18,20 @@ def mock_logger():
 
 # test fetch_file_contents
 def test_fetch_file_contents_success(mock_logger):
+    # create mock s3 client
     mock_s3_client = MagicMock()
+
+    # define mock return value to simulate the response from s3
     mock_s3_client.get_object.return_value = {
         'Body': MagicMock(read=MagicMock(return_value=b'test_image_content')),
         'ContentLength': 18,
         'ContentType': 'image/png'
     }
     
+    # call the function
     response, content = fetch_file_contents(mock_s3_client, 'test-bucket', 'test-key', mock_logger)
 
+    # validate the respoonse
     assert response['Body'].read() == b'test_image_content'
     assert content == b'test_image_content'
     mock_logger.info.assert_called_with("File test-key read successfully from test-bucket... Size: 18 bytes...")
@@ -34,13 +39,17 @@ def test_fetch_file_contents_success(mock_logger):
 
 # test fetch_file_contents with access denied
 def test_fetch_file_contents_access_denied(mock_logger):
+    # create mock s3 client
     mock_s3_client = MagicMock()
-    mock_error = ClientError({"Error": {"Code": "AccessDenied"}}, "GetObject")
 
+    # simulate client error when fetching from s3
+    mock_error = ClientError({"Error": {"Code": "AccessDenied"}}, "GetObject")
     mock_s3_client.get_object.side_effect = mock_error
 
+    # call the function
     response, content = fetch_file_contents(mock_s3_client, 'test-bucket', 'test-key', mock_logger)
 
+    # check the response is None
     assert response is None
     assert content is None
     mock_logger.error.assert_called_with("Access denied for test-key in test-bucket...")
@@ -48,9 +57,11 @@ def test_fetch_file_contents_access_denied(mock_logger):
 
 # test extract_metadata
 def test_extract_metadata(mock_logger):
+    # mock the file content and object key
     mock_s3_file_content = b'fake_image_data'  
     mock_object_key = 'images/sample.jpg'  
 
+    # define the expected metadata
     expected_metadata = {
         'imageId': mock_object_key,
         'fileName': 'sample.jpg',
@@ -61,14 +72,17 @@ def test_extract_metadata(mock_logger):
         'timestamp': '2024-01-01T00:00:00.000000'  
     }
 
+
     mock_s3_response = {
         'ContentLength': expected_metadata['fileSize'],  
         'ContentType': 'image/jpeg'  
     }
 
+    # mock the image size extraction function with fixed values since we are having trouble with the get_image_size function
     with patch('lambda_code.utils.get_image_size', return_value=(100, 200)):
         metadata = extract_metadata(mock_s3_response, mock_s3_file_content, mock_object_key, mock_logger)
 
+    # validate the metadata
     assert metadata is not None
     assert metadata['imageId'] == expected_metadata['imageId']
     assert metadata['fileName'] == expected_metadata['fileName']
@@ -80,26 +94,34 @@ def test_extract_metadata(mock_logger):
 
 # test extract_metadata with missing file size
 def test_extract_metadata_with_none_values(mock_logger):
+    # mock S3 response with None for ContentLength to simulate missing size
     mock_s3_response = {
         'ContentLength': None,  
         'ContentType': 'image/jpeg'  
     }
+
+    # mock the file content and object key
     mock_s3_file_content = b'fake_image_data'  
     mock_object_key = 'images/sample.jpg'  
 
+    # call the function
     metadata = extract_metadata(mock_s3_response, mock_s3_file_content, mock_object_key, mock_logger)
 
+    # check metadata extraction failed
     assert metadata is None  
     mock_logger.error.assert_called_with(f"Skipping {mock_object_key} due to image metadata extraction failure...")
 
 
 # test get_image_size with error
 def test_get_image_size_error(mock_logger):
+    # mock the Image.open method to raise an exception
     with patch('PIL.Image.open') as mock_open:
         mock_open.side_effect = Exception("Cannot identify image file")
 
+        # call the function
         width, height = get_image_size(b'invalid_image_data', mock_logger)
 
+        # ensure height and width are none 
         assert width == None
         assert height == None
         mock_logger.error.assert_called_with("Error getting image size: Cannot identify image file...")
@@ -107,8 +129,11 @@ def test_get_image_size_error(mock_logger):
 
 # test get rds creds
 def test_get_rds_credentials(mock_logger):
+    # define test secret name
     secret_name = "test-secret"
+    # mock the secret client
     mock_secrets_client = MagicMock()
+    # mock the response from secrets manager
     mock_response = {
         'SecretString': json.dumps({
             'username': 'test_user',
@@ -118,11 +143,14 @@ def test_get_rds_credentials(mock_logger):
         })
     }
     
+    # mock the boto3 client to return our mock Secrets Manager client
     with patch('boto3.client', return_value=mock_secrets_client):
         mock_secrets_client.get_secret_value.return_value = mock_response
         
+        # call the function
         username, password, host, dbname = get_rds_credentials(secret_name, mock_logger)
 
+        # validate credentials retrieved
         assert username == 'test_user'
         assert password == 'test_pass'
         assert host == 'test_host'
@@ -132,6 +160,7 @@ def test_get_rds_credentials(mock_logger):
 
 # test write_to_rds
 def test_write_to_rds(mock_logger):
+    # define mock image metadata
     mock_image_metadata = {
         'imageId': 'test-image-id',
         'fileName': 'test_image.jpg',
@@ -142,19 +171,28 @@ def test_write_to_rds(mock_logger):
         'timestamp': '2024-01-01T00:00:00.000000'
     }
 
+    # mock the db connection and cursor
     mock_connection = MagicMock()
     mock_cursor = MagicMock()
+    # enable context manager for the cursor
     mock_cursor.__enter__.return_value = mock_cursor  
+    # mock the cursor creation
     mock_connection.cursor.return_value = mock_cursor
 
+    # mock the db connection and write operation
     with patch('lambda_code.db_helpers.get_rds_credentials', return_value=('username', 'password', 'host', 'dbname')), \
          patch('pymysql.connect', return_value=mock_connection):
 
+        # call the function
         write_to_rds(mock_image_metadata, mock_logger)
 
+        # ensure metadata is written 
         mock_logger.info.assert_called_with("Metadata written to RDS successfully...")
+        # check the cursor was created
         mock_connection.cursor.assert_called_once()
+        # check that execute was called
         mock_cursor.execute.assert_called_once()
+        # check commit was called
         mock_connection.commit.assert_called_once()
 
 # NOTE: I had trouble getting the unit test for the handler to work, the issue seems to be with getting the image size function to work properly, this should be addressed at a later time 
