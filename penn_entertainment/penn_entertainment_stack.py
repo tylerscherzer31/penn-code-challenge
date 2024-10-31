@@ -75,6 +75,7 @@ class PennEntertainmentStack(Stack):
                 "RDS_PORT": rds_instance.db_instance_endpoint_port,
                 "DB_NAME": "metadataDB",
                 "DB_USER": "dbadmin",
+                "RDS_SECRET_NAME": rds_instance.secret.secret_name if rds_instance.secret else "",
             },
             # attach lambda layer with dependencies
             layers=[lambda_layer],
@@ -94,10 +95,10 @@ class PennEntertainmentStack(Stack):
         lambda_function.role.add_managed_policy(
             iam.ManagedPolicy.from_aws_managed_policy_name("AmazonRDSFullAccess")
         )
-        # give lambda role read only access to secret 
-        lambda_function.role.add_managed_policy(
-            iam.ManagedPolicy.from_aws_managed_policy_name("SecretsManagerReadOnly")
-        )
+
+        # grant Lambda role read only access to the automatically created secret
+        if rds_instance.secret: 
+            rds_instance.secret.grant_read(lambda_function)
 
         # create S3 event notification for Lambda
         # this event notification is specefic to objects created within the images folder in s3

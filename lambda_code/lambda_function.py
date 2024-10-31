@@ -38,7 +38,7 @@ def handler(event):
                 logger.error(f"Skipping file {object_key}... Could not extract file metadata...")
                 continue
             
-            # write the image metadata to rds
+            # write the image metadata to rds if extraction was successfull 
             write_to_rds(image_metadata, logger)
         
         except Exception as e:
