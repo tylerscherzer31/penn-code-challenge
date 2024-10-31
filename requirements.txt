@@ -1,0 +1,8 @@
+aws-cdk-lib==2.164.1
+constructs>=10.0.0,<11.0.0
+Pillow>=10.1.0
+PyMySQL
+boto3
+pytest
+moto
+pytest-mock
