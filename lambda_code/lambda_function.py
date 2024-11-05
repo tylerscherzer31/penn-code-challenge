@@ -1,12 +1,12 @@
 import boto3
 
-from .logging_helpers import create_logger
-from .s3_helpers import fetch_file_contents
-from .db_helpers import write_to_rds
-from .utils import extract_metadata
+from logging_helpers import create_logger
+from s3_helpers import fetch_file_contents
+# from db_helpers import write_to_rds
+from utils import extract_metadata
 
 
-def handler(event):
+def handler(event, context):
     logger = create_logger()
     logger.info(f"Invoking image metadata extractor lambda...")
 
@@ -39,7 +39,7 @@ def handler(event):
                 continue
             
             # write the image metadata to rds if extraction was successfull 
-            write_to_rds(image_metadata, logger)
+            # write_to_rds(image_metadata, logger)
         
         except Exception as e:
             # handle any unexpected errors
